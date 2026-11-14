@@ -214,5 +214,6 @@ def semantic_search(
 def reindex(db: Session = Depends(get_db), index: RecipeIndex = Depends(get_index)) -> dict:
     """Rebuild the vector index from the database (recovery tool)."""
     recipes = list(db.scalars(select(Recipe)))
+    index.llm.embed(["ping"])  # raises LLMUnavailable (503) before anything is deleted
     index.reset()
     return {"indexed": index.upsert(recipes)}

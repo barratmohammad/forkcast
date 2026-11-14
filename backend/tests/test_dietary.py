@@ -50,3 +50,41 @@ def test_whole_word_matching_avoids_false_gluten():
 def test_more_fish_detected():
     for fish in ("Sea Bass Fillets", "Herring", "barramundi", "jamón ibérico", "Conchs"):
         assert "vegetarian" not in detect_tags([fish]), fish
+
+
+def test_exception_phrase_does_not_veto_rest_of_name():
+    assert "vegetarian" not in detect_tags(["Chicken and mushroom pie"])
+
+
+def test_review_found_misses():
+    for meat in ("Pilchards", "Frog Legs", "Marshmallows"):
+        assert "vegetarian" not in detect_tags([meat]), meat
+    for gluten in (
+        "Baguette",
+        "Ciabatta",
+        "English Muffins",
+        "Rigatoni",
+        "Farfalle",
+        "Phyllo Dough",
+        "Filo pastry",
+        "Freekeh",
+        "Maria Cookies",
+        "Rice Krispies",
+        "Grape-Nuts",
+    ):
+        assert "gluten-free" not in detect_tags([gluten]), gluten
+
+
+def test_seed_regressions():
+    """Titles from the bundled TheMealDB data that were mislabelled before the fix."""
+    import json
+    from pathlib import Path
+
+    data = {r["title"]: r for r in json.loads(Path("data/seed_recipes.json").read_text())}
+
+    def tags(title):
+        return detect_tags([i["name"] for i in data[title]["ingredients"]])
+
+    assert "vegetarian" not in tags("Pilchard puttanesca")
+    assert "vegetarian" not in tags("Frog Legs Recipe in Garlic Butter")
+    assert "vegan" not in tags("Rocky Road Fudge")

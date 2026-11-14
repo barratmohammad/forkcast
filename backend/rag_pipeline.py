@@ -120,10 +120,11 @@ class RecipeIndex:
 
     def search(self, query: str, tags: list[str], k: int) -> list[tuple[int, float]]:
         """Return up to k (recipe_id, cosine_distance) pairs, closest first."""
+        # Embed first so an Ollama outage surfaces as LLMUnavailable even on an empty index.
+        vector = self.llm.embed([QUERY_PREFIX + query])[0]
         total = self.count()
         if total == 0:
             return []
-        vector = self.llm.embed([QUERY_PREFIX + query])[0]
         result = self.collection.query(
             query_embeddings=[vector], n_results=min(k, total), where=build_where(tags)
         )
@@ -268,7 +269,7 @@ def plan_meals(
         if not isinstance(item, dict):
             continue
         try:
-            slot = (int(item.get("day")), str(item.get("meal")))
+            slot = (int(item.get("day")), str(item.get("meal")).strip().lower())
             rid = int(item.get("recipe_id"))
         except (TypeError, ValueError):
             continue

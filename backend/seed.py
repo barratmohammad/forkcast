@@ -2,6 +2,8 @@
 
 import json
 import logging
+import threading
+from collections.abc import Callable
 from pathlib import Path
 
 from sqlalchemy import select
@@ -67,3 +69,26 @@ def sync_index(db: Session, index: RecipeIndex) -> int:
         return 0
     log.info("Indexed %d recipes", count)
     return count
+
+
+def run_indexer(
+    session_factory: Callable[[], Session],
+    index: RecipeIndex,
+    interval: float,
+    stop: threading.Event,
+) -> None:
+    """Keep the vector index in sync until `stop` is set.
+
+    Runs a sync immediately, then every `interval` seconds, so recipes saved while
+    Ollama was down (or a first start before Ollama) get indexed once it comes back.
+    """
+    while not stop.is_set():
+        try:
+            db = session_factory()
+            try:
+                sync_index(db, index)
+            finally:
+                db.close()
+        except Exception:  # never let the indexer thread die
+            log.exception("Background indexing pass failed; will retry")
+        stop.wait(interval)

@@ -109,3 +109,11 @@ def test_prompt_lists_diet_tags_and_forbids_inventing_them(client, seeded, fake_
     system, user = fake_llm.chat_calls[0][0]["content"], fake_llm.chat_calls[0][1]["content"]
     assert "diet tags" in system.lower()
     assert "(diet: dairy-free, gluten-free, vegan, vegetarian)" in user
+
+
+def test_ask_503_when_index_empty_and_ollama_down(client, auth_headers, fake_llm):
+    """A fresh volume started before Ollama must say 'Ollama down', not 'no match'."""
+    h = auth_headers()
+    fake_llm.down = True
+    r = client.post("/ask", json={"question": "chickpea curry"}, headers=h)
+    assert r.status_code == 503

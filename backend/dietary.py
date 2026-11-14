@@ -69,6 +69,9 @@ MEAT_AND_FISH = (
     "octopus",
     "calamari",
     "worcestershire",
+    "pilchard",
+    "frog",
+    "marshmallow",
     "sea bass",
     "bass",
     "herring",
@@ -194,6 +197,18 @@ GLUTEN = (
     "gnocchi",
     "seitan",
     "malt",
+    "baguette",
+    "ciabatta",
+    "muffin",
+    "rigatoni",
+    "farfalle",
+    "phyllo",
+    "filo",
+    "freekeh",
+    "cookie",
+    "krispies",
+    "grape-nuts",
+    "grape nuts",
 )
 GLUTEN_EXCEPTIONS = (
     "rice flour",
@@ -226,9 +241,10 @@ def _contains(name: str, keywords: tuple[str, ...], exceptions: tuple[str, ...])
     for words in (keywords, exceptions):
         if words not in _PATTERNS:
             _PATTERNS[words] = _pattern(words)
-    if _PATTERNS[exceptions].search(name):
-        return False
-    return bool(_PATTERNS[keywords].search(name))
+    # Remove exception phrases first, then look for keywords in what is left, so
+    # "chicken and mushroom pie" still counts as meat even though "mushroom" is an exception.
+    remainder = _PATTERNS[exceptions].sub(" ", name)
+    return bool(_PATTERNS[keywords].search(remainder))
 
 
 def detect_tags(ingredient_names: list[str]) -> list[str]:

@@ -18,25 +18,30 @@ from routers import auth as auth_router
 from routers import meal_plans as meal_plans_router
 from routers import recipes as recipes_router
 from schemas import Health
-from seed import load_seed_recipes, sync_index
+from seed import load_seed_recipes, run_indexer
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 
 
-def _index_in_background() -> None:
-    """Embed un-indexed recipes without blocking startup (300 embeddings take a while)."""
-    with SessionLocal() as db:
-        sync_index(db, get_index())
+INDEX_SYNC_INTERVAL_SECONDS = 30
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """On startup: load seed recipes once, then index anything missing in the background."""
+    """On startup: load seed recipes once, then keep the index in sync in the background."""
+    stop = threading.Event()
     if app.state.seed:
         with SessionLocal() as db:
             load_seed_recipes(db)
-        threading.Thread(target=_index_in_background, daemon=True).start()
+        # Index in the background (790 embeddings take a while) and keep retrying,
+        # so starting before Ollama, or saving recipes while it is down, heals itself.
+        threading.Thread(
+            target=run_indexer,
+            args=(SessionLocal, get_index(), INDEX_SYNC_INTERVAL_SECONDS, stop),
+            daemon=True,
+        ).start()
     yield
+    stop.set()
 
 
 def create_app(seed: bool | None = None) -> FastAPI:

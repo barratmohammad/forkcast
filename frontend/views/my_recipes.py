@@ -10,6 +10,19 @@ DIET_TAGS = ["vegetarian", "vegan", "gluten-free", "dairy-free"]
 NEW = "➕ New recipe"
 
 
+def _text(value) -> str:
+    """Cell value as stripped text; empty for None/NaN/NA (pandas fills blank cells)."""
+    if value is None or (not isinstance(value, str) and pd.isna(value)):
+        return ""
+    return str(value).strip()
+
+
+def clean_rows(records: list[dict]) -> list[dict]:
+    """Ingredient editor rows → API ingredients, dropping rows with no name."""
+    rows = [{"name": _text(r.get("name")), "measure": _text(r.get("measure"))} for r in records]
+    return [r for r in rows if r["name"]]
+
+
 def _recipe_form(api: APIClient, existing: dict | None) -> None:
     """Create/edit form. `existing` is None for a new recipe."""
     key = f"form_{existing['id'] if existing else 'new'}"
@@ -39,8 +52,9 @@ def _recipe_form(api: APIClient, existing: dict | None) -> None:
         )
         auto = st.checkbox(
             "Auto-detect diet tags from ingredients",
-            value=existing is None,
-            help="ForkCast checks ingredients for meat, fish, dairy, eggs, honey and gluten.",
+            value=True,
+            help="ForkCast checks ingredients for meat, fish, dairy, eggs, honey and gluten. "
+            "Leave this on when editing so tags stay correct if ingredients change.",
         )
         manual = st.multiselect(
             "Diet tags (used when auto-detect is off)",
@@ -53,11 +67,7 @@ def _recipe_form(api: APIClient, existing: dict | None) -> None:
 
     if not submitted:
         return
-    rows = [
-        {"name": str(r["name"]).strip(), "measure": str(r.get("measure") or "").strip()}
-        for r in table.to_dict("records")
-        if r.get("name") and str(r["name"]).strip() and str(r["name"]) != "nan"
-    ]
+    rows = clean_rows(table.to_dict("records"))
     if len(title.strip()) < 3 or not rows or len(instructions.strip()) < 10:
         st.warning(
             "A recipe needs a title (3+ characters), at least one ingredient, "

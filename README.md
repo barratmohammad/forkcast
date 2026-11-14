@@ -132,12 +132,12 @@ Every request and response body is a Pydantic model. Invalid input returns `422`
 ```bash
 cd backend
 python3.12 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
-.venv/bin/pytest            # 65 tests
+.venv/bin/pytest            # 72 tests
 .venv/bin/ruff check .
 
 cd ../frontend
 python3.12 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
-.venv/bin/pytest            # 7 tests
+.venv/bin/pytest            # 9 tests
 ```
 
 The tests never need Ollama. A fake client stands in for it, with deterministic embeddings and scripted replies, and each test gets an in-memory database and its own ChromaDB collection. They cover:
@@ -184,7 +184,7 @@ The tests never need Ollama. A fake client stands in for it, with deterministic 
 - **Diet tags are rules, not AI.** Whole-word ingredient matching with exceptions (coconut milk is dairy-free, kidney beans aren't kidney). It's instant, testable and explainable. It found 14 recipes that TheMealDB itself labels "Vegetarian" but which contain chicken stock, lard, bacon or fish sauce.
 - **Ollama runs on the host, not in Docker.** Docker on macOS can't use the Apple GPU, so a containerised Ollama is CPU-only and much slower.
 - **ChromaDB is embedded and the database is SQLite.** There's one client of each and it's a single-user demo, so fewer containers means fewer things to break. SQLAlchemy keeps PostgreSQL one connection string away.
-- **Failure tolerance.** If Ollama is down, the backend still starts, browsing and CRUD keep working, saved recipes are indexed later, and AI features return a clear 503 that the UI shows as a friendly message.
+- **Failure tolerance.** If Ollama is down, the backend still starts, browsing and CRUD keep working, a background job retries indexing every 30 seconds (so recipes saved meanwhile, or a first start before Ollama, catch up automatically), and AI features return a clear 503 that the UI shows as a friendly message.
 
 ## Known Limitations & Future Improvements
 

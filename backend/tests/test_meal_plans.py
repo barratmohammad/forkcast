@@ -125,3 +125,12 @@ def test_deleting_recipe_removes_it_from_plans(client, seeded, fake_llm):
     r = client.get(f"/meal-plans/{pid}", headers=h)
     assert r.status_code == 200
     assert r.json()["items"] == []
+
+
+def test_plan_meal_names_are_case_insensitive(client, seeded, fake_llm):
+    h, ids = seeded
+    fake_llm.chat_reply = json.dumps(
+        {"items": [{"day": 1, "meal": "Dinner ", "recipe_id": ids["Beef Stew"]}]}
+    )
+    r = client.post("/meal-plans", json={"days": 1}, headers=h)
+    assert r.json()["items"][0]["recipe"]["id"] == ids["Beef Stew"]
