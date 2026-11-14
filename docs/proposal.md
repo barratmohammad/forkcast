@@ -27,7 +27,7 @@
 
 ## Tech Stack
 
-FastAPI · SQLAlchemy (SQLite) · Pydantic v2 · python-jose (JWT) · ChromaDB · Ollama (`llama3.2:3b`, `nomic-embed-text`) · Streamlit · Docker Compose · pytest
+FastAPI · SQLAlchemy (SQLite) · Pydantic v2 · PyJWT + bcrypt (JWT auth) · ChromaDB · Ollama (`llama3.2:3b`, `nomic-embed-text`) · Streamlit · Docker Compose · pytest
 
 ## Risks & Backup Plans
 
