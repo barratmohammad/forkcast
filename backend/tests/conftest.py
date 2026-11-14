@@ -28,15 +28,42 @@ def db_session():
 
 
 @pytest.fixture
-def client(db_session):
+def fake_llm():
+    """A fresh FakeLLM per test."""
+    from tests.fakes import FakeLLM
+
+    return FakeLLM()
+
+
+@pytest.fixture
+def index(fake_llm):
+    """A RecipeIndex on an in-memory Chroma collection unique to this test."""
+    import uuid
+
+    import chromadb
+
+    from rag_pipeline import RecipeIndex
+
+    chroma = chromadb.EphemeralClient(chromadb.Settings(anonymized_telemetry=False))
+    idx = RecipeIndex(chroma, fake_llm, collection_name=f"test_{uuid.uuid4().hex}")
+    yield idx
+    chroma.delete_collection(idx.collection_name)
+
+
+@pytest.fixture
+def client(db_session, fake_llm, index):
     """TestClient with the DB dependency pointed at the in-memory test database."""
     from fastapi.testclient import TestClient
 
     from database import get_db
     from main import create_app
+    from ollama_client import get_llm
+    from rag_pipeline import get_index
 
     app = create_app(seed=False)
     app.dependency_overrides[get_db] = lambda: db_session
+    app.dependency_overrides[get_llm] = lambda: fake_llm
+    app.dependency_overrides[get_index] = lambda: index
     with TestClient(app) as c:
         c.app_ref = app
         yield c
