@@ -150,7 +150,7 @@ def main():
         for chunk in textwrap.wrap(lines[num - 1], 88):
             print(f"  {chunk}")
         while True:
-            cmd = input(f"\n  Enter to record (s = skip, q = quit) ").strip().lower()
+            cmd = input("\n  Enter to record (s = skip, q = quit) ").strip().lower()
             if cmd == "q":
                 show_total(folder, n)
                 return
