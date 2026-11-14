@@ -59,7 +59,7 @@ More detail is in [docs/design.md](docs/design.md).
 
 ```bash
 # 1. Clone
-git clone <your-repo-url> forkcast && cd forkcast
+git clone https://github.com/barratmohammad/forkcast.git && cd forkcast
 
 # 2. Configure
 cp .env.example .env
