@@ -42,7 +42,7 @@ def _recipe_form(api: APIClient, existing: dict | None) -> None:
             num_rows="dynamic",
             width="stretch",
             column_config={
-                "name": st.column_config.TextColumn("Ingredient", required=True),
+                "name": st.column_config.TextColumn("Ingredient"),
                 "measure": st.column_config.TextColumn("Amount"),
             },
             key=f"{key}_ings",

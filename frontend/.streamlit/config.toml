@@ -1,0 +1,9 @@
+[client]
+# Hide Streamlit's developer "Deploy" button; keep the menu minimal.
+toolbarMode = "minimal"
+
+[browser]
+gatherUsageStats = false
+
+[theme]
+primaryColor = "#c8384a"

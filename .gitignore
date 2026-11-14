@@ -17,3 +17,8 @@ venv/
 # tooling
 .superpowers/
 .DS_Store
+
+# presentation video build artifacts
+presentation/build/
+presentation/narration*/
+presentation/*.mp4
