@@ -1,8 +1,13 @@
 """Rule-based dietary tag detection from ingredient names.
 
+Keywords match whole words (plus a plural "s"/"es"), so "mince" does not match
+"minced garlic" and "bun" does not match "bunch".
+
 These are heuristics, not guarantees: the UI always shows tags as editable and
 the /ask endpoint appends an allergy disclaimer when diet filters are used.
 """
+
+import re
 
 DIET_TAGS: tuple[str, ...] = ("vegetarian", "vegan", "gluten-free", "dairy-free")
 
@@ -42,10 +47,12 @@ MEAT_AND_FISH = (
     "salmon",
     "tuna",
     "cod",
+    "codfish",
     "haddock",
     "mackerel",
     "sardine",
-    "anchov",
+    "anchovy",
+    "anchovies",
     "trout",
     "tilapia",
     "halibut",
@@ -62,13 +69,42 @@ MEAT_AND_FISH = (
     "octopus",
     "calamari",
     "worcestershire",
+    "sea bass",
+    "bass",
+    "herring",
+    "barramundi",
+    "conch",
+    "jamón",
+    "jamon",
+    "seafood",
+    "bream",
+    "snapper",
+    "hake",
+    "pollock",
+    "kipper",
+    "eel",
+    "caviar",
+    "meatball",
+    "pork belly",
+    "bouillon",
     "stock cube",
     "chicken stock",
     "beef stock",
     "fish stock",
 )
 # Plant-based names that contain a meat keyword.
-MEAT_EXCEPTIONS = ("vegetable stock", "veggie", "mushroom", "nutmeg", "coconut meat")
+MEAT_EXCEPTIONS = (
+    "kidney bean",
+    "goats cheese",
+    "goat cheese",
+    "goat's cheese",
+    "vegetable bouillon",
+    "vegetable stock",
+    "veggie",
+    "mushroom",
+    "nutmeg",
+    "coconut meat",
+)
 
 DAIRY = (
     "milk",
@@ -136,6 +172,7 @@ GLUTEN = (
     "bulgur",
     "semolina",
     "breadcrumb",
+    "breadcrumbs",
     "tortilla",
     "pastry",
     "beer",
@@ -175,11 +212,23 @@ GLUTEN_EXCEPTIONS = (
 )
 
 
+def _pattern(words: tuple[str, ...]) -> re.Pattern:
+    """Regex matching any of `words` as a whole word, optionally pluralized."""
+    alternatives = "|".join(re.escape(w) for w in sorted(words, key=len, reverse=True))
+    return re.compile(rf"\b(?:{alternatives})(?:e?s)?\b")
+
+
+_PATTERNS: dict[tuple[str, ...], re.Pattern] = {}
+
+
 def _contains(name: str, keywords: tuple[str, ...], exceptions: tuple[str, ...]) -> bool:
     """True if `name` matches a keyword and is not covered by an exception phrase."""
-    if any(exc in name for exc in exceptions):
+    for words in (keywords, exceptions):
+        if words not in _PATTERNS:
+            _PATTERNS[words] = _pattern(words)
+    if _PATTERNS[exceptions].search(name):
         return False
-    return any(kw in name for kw in keywords)
+    return bool(_PATTERNS[keywords].search(name))
 
 
 def detect_tags(ingredient_names: list[str]) -> list[str]:

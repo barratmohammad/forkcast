@@ -31,10 +31,12 @@ NOT_OWNER = "You can only modify your own recipes"
 def ensure_tags(db: Session) -> dict[str, Tag]:
     """Make sure every diet tag row exists; return them keyed by name."""
     existing = {t.name: t for t in db.scalars(select(Tag))}
-    for name in DIET_TAGS:
-        if name not in existing:
-            existing[name] = Tag(name=name)
-            db.add(existing[name])
+    missing = [name for name in DIET_TAGS if name not in existing]
+    for name in missing:
+        existing[name] = Tag(name=name)
+        db.add(existing[name])
+    if missing:
+        db.flush()  # make new tags visible to the next lookup (autoflush is off)
     return existing
 
 
@@ -123,8 +125,8 @@ def create_recipe(
     """Create a recipe, tag it, and add it to the vector index."""
     data = body.model_dump(exclude={"tags"})
     recipe = Recipe(**data, source="user", owner=user)
-    apply_tags(db, recipe, body.tags)
     db.add(recipe)
+    apply_tags(db, recipe, body.tags)
     db.commit()
     db.refresh(recipe)
     return to_out(recipe, indexed=sync_vector(index, recipe))
@@ -206,3 +208,11 @@ def semantic_search(
         if recipe is not None:
             results.append(SearchHit(recipe=to_out(recipe), score=round(1 - distance, 3)))
     return results
+
+
+@router.post("/admin/reindex")
+def reindex(db: Session = Depends(get_db), index: RecipeIndex = Depends(get_index)) -> dict:
+    """Rebuild the vector index from the database (recovery tool)."""
+    recipes = list(db.scalars(select(Recipe)))
+    index.reset()
+    return {"indexed": index.upsert(recipes)}

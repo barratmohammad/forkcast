@@ -1,11 +1,16 @@
 """ForkCast FastAPI application factory and health endpoint."""
 
+import logging
+import threading
+from contextlib import asynccontextmanager
+
 from fastapi import Depends, FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from database import Base, engine, get_db
+from config import get_settings
+from database import Base, SessionLocal, engine, get_db
 from ollama_client import LLMUnavailable, get_llm
 from rag_pipeline import RecipeIndex, get_index
 from routers import ask as ask_router
@@ -13,6 +18,25 @@ from routers import auth as auth_router
 from routers import meal_plans as meal_plans_router
 from routers import recipes as recipes_router
 from schemas import Health
+from seed import load_seed_recipes, sync_index
+
+logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+
+
+def _index_in_background() -> None:
+    """Embed un-indexed recipes without blocking startup (300 embeddings take a while)."""
+    with SessionLocal() as db:
+        sync_index(db, get_index())
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """On startup: load seed recipes once, then index anything missing in the background."""
+    if app.state.seed:
+        with SessionLocal() as db:
+            load_seed_recipes(db)
+        threading.Thread(target=_index_in_background, daemon=True).start()
+    yield
 
 
 def create_app(seed: bool | None = None) -> FastAPI:
@@ -22,7 +46,9 @@ def create_app(seed: bool | None = None) -> FastAPI:
         title="ForkCast API",
         description="AI recipe assistant: grounded recipe Q&A, meal plans and shopping lists.",
         version="1.0.0",
+        lifespan=lifespan,
     )
+    app.state.seed = get_settings().seed_on_startup if seed is None else seed
     app.include_router(auth_router.router)
     app.include_router(recipes_router.router)
     app.include_router(ask_router.router)

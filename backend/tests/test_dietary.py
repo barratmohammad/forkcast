@@ -37,3 +37,16 @@ def test_meat_detected_case_insensitively():
 def test_meta_key():
     assert tag_to_meta_key("gluten-free") == "gluten_free"
     assert tag_to_meta_key("vegan") == "vegan"
+
+
+def test_whole_word_matching_avoids_false_meat():
+    assert "vegetarian" in detect_tags(["minced garlic", "kidney beans", "goats cheese"])
+
+
+def test_whole_word_matching_avoids_false_gluten():
+    assert "gluten-free" in detect_tags(["bunch of coriander", "rice"])
+
+
+def test_more_fish_detected():
+    for fish in ("Sea Bass Fillets", "Herring", "barramundi", "jamón ibérico", "Conchs"):
+        assert "vegetarian" not in detect_tags([fish]), fish
