@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     ollama_timeout: float = 90
 
     rag_top_k: int = 5
-    rag_max_distance: float = 0.5
+    rag_max_distance: float = 0.41
 
     seed_on_startup: bool = True
 

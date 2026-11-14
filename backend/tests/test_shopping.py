@@ -30,3 +30,20 @@ def test_normalize_keeps_double_s():
     assert normalize_name("  Swiss  Cheese ") == "swiss cheese"
     assert normalize_name("Cress") == "cress"
     assert normalize_name("tomatoes") == "tomato"
+
+
+def test_on_hand_matches_whole_words_in_longer_names():
+    result = build_shopping_list(
+        [
+            (
+                "Rice and Beans",
+                [
+                    {"name": "Long Grain Rice", "measure": "2 cups"},
+                    {"name": "Eggplant", "measure": "1"},
+                ],
+            )
+        ],
+        on_hand=["rice", "egg"],
+    )
+    assert result["have"] == ["long grain rice"]
+    assert [i["name"] for i in result["items"]] == ["eggplant"]

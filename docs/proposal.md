@@ -23,7 +23,7 @@
 
 ## Data Source
 
-~300 recipes from **TheMealDB** (free public API, educational use), fetched once by a seed script and committed as `data/seed_recipes.json` so the app never depends on the API at runtime. Each recipe has a title, category, cuisine, ingredients with measures, and instructions. Dietary tags (vegetarian, vegan, gluten-free, dairy-free) are derived from ingredients. Users add their own recipes on top; those are embedded on save.
+790 recipes from **TheMealDB** (free public API, educational use), fetched once by a seed script and committed as `data/seed_recipes.json` so the app never depends on the API at runtime. Each recipe has a title, category, cuisine, ingredients with measures, and instructions. Dietary tags (vegetarian, vegan, gluten-free, dairy-free) are derived from ingredients. Users add their own recipes on top; those are embedded on save.
 
 ## Tech Stack
 

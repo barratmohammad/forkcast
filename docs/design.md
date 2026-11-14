@@ -114,7 +114,7 @@ All request and response bodies are Pydantic v2 models. 🔒 = requires `Authori
 - **Embeddings:** `nomic-embed-text` via Ollama's `/api/embed` (batched), with the `search_document:` / `search_query:` prefixes that model expects. This keeps the backend image slim (no torch or ONNX model download).
 - **Vector store:** Chroma collection `recipes`, cosine space. ID = `str(recipe.id)`. Metadata holds booleans per diet tag (`vegetarian`, `vegan`, `gluten_free`, `dairy_free`), plus `category`, `cuisine` and `owner_id`, so diet filters run inside the vector query.
 - **Sync:** recipe create/update/delete writes to SQL first, then upserts or deletes the vector. If Ollama is down, the SQL write still succeeds, the response carries `indexed: false`, and `/admin/reindex` catches it up.
-- **Startup:** create tables → if no recipes, load `backend/data/seed_recipes.json` → index any recipe missing from Chroma. A failed indexing pass logs a warning instead of crashing the app.
+- **Startup:** create tables → if no recipes, load `backend/data/seed_recipes.json` (790 TheMealDB recipes) → index any recipe missing from Chroma. A failed indexing pass logs a warning instead of crashing the app.
 - **Guardrails (rubric: at least one):**
   1. Distance threshold → canned "I couldn't find a recipe in the collection that fits. Try loosening a filter." (No LLM call.)
   2. Grounding prompt: use only the provided recipes and cite `[#id]`.
@@ -122,7 +122,7 @@ All request and response bodies are Pydantic v2 models. 🔒 = requires `Authori
   4. Allergy disclaimer is appended whenever diet tags are used.
 - **Meal plans:** retrieve ~20 candidates matching the tags (query built from `on_hand` + notes) → ask Ollama with `format: "json"` to return `{"items":[{"day","meal","recipe_id"}], "notes"}` → drop any `recipe_id` not among the candidates. If the JSON is invalid, retry once, then fall back to the top-ranked candidates. The model can only ever choose real recipes.
 - **Shopping list:** pure Python. Group the plan's ingredients by normalized name, list each measure next to the recipe that needs it, and split out the items in `on_hand` as "you already have".
-- **Config (env):** `OLLAMA_BASE_URL`, `OLLAMA_MODEL=llama3.2:3b`, `OLLAMA_EMBED_MODEL=nomic-embed-text`, `OLLAMA_TIMEOUT=90`, `RAG_TOP_K=5`, `RAG_MAX_DISTANCE` (tuned empirically on Day 5 from about 20 probe questions; starting value 0.5).
+- **Config (env):** `OLLAMA_BASE_URL`, `OLLAMA_MODEL=llama3.2:3b`, `OLLAMA_EMBED_MODEL=nomic-embed-text`, `OLLAMA_TIMEOUT=90`, `RAG_TOP_K=5`, `RAG_MAX_DISTANCE` (tuned empirically on Day 5 from about 20 probe questions; tuned to 0.41 — on-topic questions scored 0.19–0.39, off-topic 0.42–0.53; see `scripts/tune_threshold.py`).
 
 ## 6. Docker Compose Plan
 

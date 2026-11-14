@@ -17,6 +17,14 @@ def normalize_name(name: str) -> str:
     return n
 
 
+def _is_on_hand(name: str, have_names: set[str]) -> bool:
+    """True if an on-hand item equals the ingredient or appears in it as a whole word."""
+    words = name.split()
+    return any(h == name or (" " not in h and h in words) for h in have_names) or any(
+        " " in h and f" {h} " in f" {name} " for h in have_names
+    )
+
+
 def build_shopping_list(recipes: list[tuple[str, list[dict]]], on_hand: list[str]) -> dict:
     """Group ingredients from (recipe_title, ingredients) pairs into a shopping list.
 
@@ -31,7 +39,7 @@ def build_shopping_list(recipes: list[tuple[str, list[dict]]], on_hand: list[str
             key = normalize_name(ing.get("name", ""))
             if not key:
                 continue
-            if key in have_names:
+            if _is_on_hand(key, have_names):
                 have.add(key)
                 continue
             entry = grouped.setdefault(key, {"name": key, "measures": [], "recipes": []})

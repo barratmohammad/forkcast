@@ -91,3 +91,21 @@ def test_allergy_note_when_tags(client, seeded, fake_llm):
         "/ask", json={"question": "chickpea curry with coconut milk", "tags": ["vegan"]}, headers=h
     )
     assert r.json()["answer"].endswith(ALLERGY_NOTE)
+
+
+def test_parenthesised_citation_counts_as_grounded(client, seeded, fake_llm):
+    """Small models often write (#12) or #12 instead of [#12]."""
+    h, ids = seeded
+    curry_id = ids["Chickpea Curry"]
+    fake_llm.chat_reply = f"Make the Chickpea Curry (#{curry_id})."
+    r = client.post("/ask", json={"question": "chickpea curry with coconut milk"}, headers=h)
+    assert r.json()["grounded"] is True
+    assert [s["recipe_id"] for s in r.json()["sources"]] == [curry_id]
+
+
+def test_prompt_lists_diet_tags_and_forbids_inventing_them(client, seeded, fake_llm):
+    h, _ = seeded
+    client.post("/ask", json={"question": "chickpea curry with coconut milk"}, headers=h)
+    system, user = fake_llm.chat_calls[0][0]["content"], fake_llm.chat_calls[0][1]["content"]
+    assert "diet tags" in system.lower()
+    assert "(diet: dairy-free, gluten-free, vegan, vegetarian)" in user

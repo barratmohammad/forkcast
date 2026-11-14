@@ -28,13 +28,16 @@ ALLERGY_NOTE = (
     "Diet tags are auto-detected from ingredients — "
     "always double-check labels if you have an allergy."
 )
-CITATION = re.compile(r"\[#(\d+)\]")
+# Accept [#12], (#12) and bare #12: small models are inconsistent about brackets.
+CITATION = re.compile(r"#(\d+)")
 
 ASK_SYSTEM_PROMPT = """You are ForkCast, a friendly, practical chef assistant.
 Answer the user's cooking question using ONLY the recipes provided below.
 Rules:
 - Recommend or discuss only the provided recipes. Never invent recipes or ingredients.
 - Cite every recipe you mention with its id in square brackets, like [#12].
+- Only describe a recipe as vegetarian, vegan, gluten-free or dairy-free if that exact
+  label appears in its diet tags. Never guess diet tags from the title.
 - If none of the provided recipes fit the question, say so plainly.
 - Be concise: a short recommendation, then key ingredients or steps if helpful."""
 
