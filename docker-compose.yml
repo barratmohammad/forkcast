@@ -1,0 +1,39 @@
+# ForkCast — start everything with:  docker compose up --build
+# Prerequisite: Ollama running on the host with llama3.2:3b and nomic-embed-text pulled.
+
+name: forkcast
+
+services:
+  backend:
+    build: ./backend
+    env_file: .env
+    environment:
+      # Ollama runs natively on the host (uses the GPU); containers reach it here.
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+      STORAGE_DIR: /app/storage
+    extra_hosts:
+      - "host.docker.internal:host-gateway" # needed on Linux; harmless on Mac/Windows
+    volumes:
+      - backend_data:/app/storage # SQLite database + ChromaDB index
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    environment:
+      API_URL: http://backend:8000 # service name, not localhost
+    ports:
+      - "${FRONTEND_PORT:-8501}:8501"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  backend_data:
