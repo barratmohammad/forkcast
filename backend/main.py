@@ -1,13 +1,15 @@
 """ForkCast FastAPI application factory and health endpoint."""
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Request, status
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from database import Base, engine, get_db
-from ollama_client import get_llm
+from ollama_client import LLMUnavailable, get_llm
 from rag_pipeline import RecipeIndex, get_index
 from routers import auth as auth_router
+from routers import recipes as recipes_router
 from schemas import Health
 
 
@@ -20,6 +22,14 @@ def create_app(seed: bool | None = None) -> FastAPI:
         version="1.0.0",
     )
     app.include_router(auth_router.router)
+    app.include_router(recipes_router.router)
+
+    @app.exception_handler(LLMUnavailable)
+    def llm_unavailable(_: Request, exc: LLMUnavailable) -> JSONResponse:
+        """Turn Ollama outages into a friendly 503 instead of a 500."""
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, content={"detail": str(exc)}
+        )
 
     @app.get("/health", response_model=Health, tags=["health"])
     def health(
