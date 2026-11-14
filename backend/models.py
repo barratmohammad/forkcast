@@ -68,6 +68,9 @@ class Recipe(Base):
 
     owner: Mapped[User] = relationship(back_populates="recipes")
     tags: Mapped[list[Tag]] = relationship(secondary=recipe_tags, back_populates="recipes")
+    plan_items: Mapped[list["MealPlanItem"]] = relationship(
+        back_populates="recipe", cascade="all, delete-orphan"
+    )
 
     @property
     def tag_names(self) -> list[str]:
@@ -112,4 +115,4 @@ class MealPlanItem(Base):
     meal: Mapped[str] = mapped_column(String(10))
 
     meal_plan: Mapped[MealPlan] = relationship(back_populates="items")
-    recipe: Mapped[Recipe] = relationship()
+    recipe: Mapped[Recipe] = relationship(back_populates="plan_items")

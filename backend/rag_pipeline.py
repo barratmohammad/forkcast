@@ -1,5 +1,7 @@
 """Retrieval-augmented generation: the recipe vector index, Q&A and meal planning."""
 
+import json
+import logging
 import re
 from functools import lru_cache
 
@@ -10,7 +12,9 @@ from config import get_settings
 from dietary import DIET_TAGS, tag_to_meta_key
 from models import Recipe
 from ollama_client import get_llm
-from schemas import AskResponse, Source
+from schemas import AskResponse, MealPlanRequest, Source
+
+log = logging.getLogger(__name__)
 
 DOC_PREFIX = "search_document: "
 QUERY_PREFIX = "search_query: "
@@ -183,6 +187,102 @@ def answer_question(
     if tags:
         answer = f"{answer}\n\n{ALLERGY_NOTE}"
     return AskResponse(answer=answer, sources=sources, grounded=grounded)
+
+
+PLAN_SYSTEM_PROMPT = """You are ForkCast's meal planner.
+Choose recipes ONLY from the candidate list, referring to them by id.
+Fill every slot listed exactly once. Prefer recipes that use the ingredients the user
+already has, avoid repeating a recipe unless there are too few candidates, and vary cuisines.
+Respond with JSON only, in this exact shape:
+{"items": [{"day": 1, "meal": "dinner", "recipe_id": 12}], "notes": "one or two sentences"}"""
+
+
+def plan_slots(days: int, meals_per_day: int) -> list[tuple[int, str]]:
+    """All (day, meal) slots for a plan, in display order."""
+    meals = ["dinner"] if meals_per_day == 1 else ["lunch", "dinner"]
+    return [(day, meal) for day in range(1, days + 1) for meal in meals]
+
+
+def _parse_plan(raw: str) -> dict | None:
+    """Parse the LLM's JSON plan; None if it isn't a JSON object."""
+    try:
+        data = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def plan_meals(
+    db: Session, index: RecipeIndex, llm, req: MealPlanRequest
+) -> tuple[list[tuple[int, str, int]], str]:
+    """Pick a recipe for every slot from retrieved candidates.
+
+    Returns ([(day, meal, recipe_id)], notes). The LLM may only choose candidate ids;
+    anything else is discarded and empty slots are filled with the best-ranked candidates.
+    Raises ValueError if no recipe matches the filters.
+    """
+    parts = []
+    if req.on_hand:
+        parts.append("meals using " + ", ".join(req.on_hand))
+    if req.notes:
+        parts.append(req.notes)
+    query = ". ".join(parts) or "easy dinner"
+    ranked = [rid for rid, _ in index.search(query, req.tags, 20)]
+    candidates = [r for r in (db.get(Recipe, rid) for rid in ranked) if r is not None]
+    if not candidates:
+        raise ValueError("No recipes match those filters.")
+    candidate_ids = [r.id for r in candidates]
+    slots = plan_slots(req.days, req.meals_per_day)
+
+    lines = [
+        f"[{r.id}] {r.title} ({', '.join(r.tag_names) or 'no diet tags'}): "
+        + ", ".join(i["name"] for i in r.ingredients[:8])
+        for r in candidates
+    ]
+    user_msg = (
+        "Candidates:\n"
+        + "\n".join(lines)
+        + "\n\nSlots: "
+        + ", ".join(f"day {d} {m}" for d, m in slots)
+        + f"\nIngredients on hand: {', '.join(req.on_hand) or 'none'}"
+        + f"\nDiet filters: {', '.join(req.tags) or 'none'}"
+        + f"\nUser notes: {req.notes or 'none'}"
+    )
+    messages = [
+        {"role": "system", "content": PLAN_SYSTEM_PROMPT},
+        {"role": "user", "content": user_msg},
+    ]
+    data = None
+    for _ in range(2):
+        data = _parse_plan(llm.chat(messages, json_mode=True))
+        if data is not None:
+            break
+        log.warning("Meal plan reply was not valid JSON; retrying")
+
+    chosen: dict[tuple[int, str], int] = {}
+    items = (data or {}).get("items", [])
+    for item in items if isinstance(items, list) else []:
+        if not isinstance(item, dict):
+            continue
+        try:
+            slot = (int(item.get("day")), str(item.get("meal")))
+            rid = int(item.get("recipe_id"))
+        except (TypeError, ValueError):
+            continue
+        if slot in slots and slot not in chosen and rid in candidate_ids:
+            chosen[slot] = rid
+
+    used = set(chosen.values())
+    fallback = [rid for rid in candidate_ids if rid not in used] or candidate_ids
+    position = 0
+    for slot in slots:
+        if slot not in chosen:
+            chosen[slot] = fallback[position % len(fallback)]
+            position += 1
+
+    notes = (data or {}).get("notes", "")
+    notes = notes if isinstance(notes, str) else ""
+    return [(d, m, chosen[(d, m)]) for d, m in slots], notes
 
 
 @lru_cache

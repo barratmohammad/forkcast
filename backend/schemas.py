@@ -1,7 +1,7 @@
 """Pydantic request/response schemas for every endpoint."""
 
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -153,3 +153,62 @@ class AskResponse(BaseModel):
     answer: str
     sources: list[Source]
     grounded: bool
+
+
+# ---------- meal plans ----------
+
+
+class MealPlanRequest(BaseModel):
+    """What the user wants planned."""
+
+    days: int = Field(default=3, ge=1, le=7)
+    meals_per_day: int = Field(default=1, ge=1, le=2)
+    tags: list[DietTag] = []
+    on_hand: list[Annotated[str, Field(min_length=1, max_length=50)]] = Field(
+        default=[], max_length=20
+    )
+    notes: str = Field(default="", max_length=300)
+
+
+class MealPlanItemOut(BaseModel):
+    """One planned meal."""
+
+    day: int
+    meal: Literal["lunch", "dinner"]
+    recipe: RecipeOut
+
+
+class MealPlanOut(BaseModel):
+    """A full meal plan with its recipes."""
+
+    id: int
+    title: str
+    request: dict
+    notes: str
+    created_at: datetime
+    items: list[MealPlanItemOut]
+
+
+class MealPlanSummary(BaseModel):
+    """A meal plan in a list view."""
+
+    id: int
+    title: str
+    created_at: datetime
+    item_count: int
+
+
+class ShoppingItem(BaseModel):
+    """One ingredient to buy, with every measure and the recipes that need it."""
+
+    name: str
+    measures: list[str]
+    recipes: list[str]
+
+
+class ShoppingList(BaseModel):
+    """Aggregated ingredients for a meal plan, minus what the user already has."""
+
+    plan_id: int
+    items: list[ShoppingItem]
+    have: list[str]

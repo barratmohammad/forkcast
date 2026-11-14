@@ -10,6 +10,7 @@ from ollama_client import LLMUnavailable, get_llm
 from rag_pipeline import RecipeIndex, get_index
 from routers import ask as ask_router
 from routers import auth as auth_router
+from routers import meal_plans as meal_plans_router
 from routers import recipes as recipes_router
 from schemas import Health
 
@@ -25,6 +26,7 @@ def create_app(seed: bool | None = None) -> FastAPI:
     app.include_router(auth_router.router)
     app.include_router(recipes_router.router)
     app.include_router(ask_router.router)
+    app.include_router(meal_plans_router.router)
 
     @app.exception_handler(LLMUnavailable)
     def llm_unavailable(_: Request, exc: LLMUnavailable) -> JSONResponse:
