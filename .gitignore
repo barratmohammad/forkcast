@@ -1,0 +1,19 @@
+# secrets
+.env
+
+# runtime data
+storage/
+chroma_data/
+*.db
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+
+# tooling
+.superpowers/
+.DS_Store
