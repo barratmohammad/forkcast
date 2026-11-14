@@ -3,12 +3,15 @@
 import os
 
 os.environ.setdefault("JWT_SECRET", "test-secret-not-for-production-0123456789abcdef")
+# Fake bag-of-words embeddings are less tight than real ones, so loosen the guardrail.
+os.environ.setdefault("RAG_MAX_DISTANCE", "0.85")
 
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+import models  # noqa: F401  (registers tables on Base.metadata)
 from database import Base
 
 

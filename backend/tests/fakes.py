@@ -7,7 +7,7 @@ import re
 from ollama_client import LLMUnavailable
 
 _PREFIX = re.compile(r"^search_(document|query):\s*")
-DIM = 128
+DIM = 512
 
 
 class FakeLLM:

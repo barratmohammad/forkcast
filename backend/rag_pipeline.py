@@ -1,17 +1,38 @@
 """Retrieval-augmented generation: the recipe vector index, Q&A and meal planning."""
 
+import re
 from functools import lru_cache
 
 import chromadb
+from sqlalchemy.orm import Session
 
 from config import get_settings
 from dietary import DIET_TAGS, tag_to_meta_key
 from models import Recipe
 from ollama_client import get_llm
+from schemas import AskResponse, Source
 
 DOC_PREFIX = "search_document: "
 QUERY_PREFIX = "search_query: "
 MAX_INSTRUCTION_CHARS = 800
+
+GUARDRAIL_ANSWER = (
+    "I couldn't find a recipe in the collection that fits. "
+    "Try rephrasing or loosening a diet filter."
+)
+ALLERGY_NOTE = (
+    "Diet tags are auto-detected from ingredients — "
+    "always double-check labels if you have an allergy."
+)
+CITATION = re.compile(r"\[#(\d+)\]")
+
+ASK_SYSTEM_PROMPT = """You are ForkCast, a friendly, practical chef assistant.
+Answer the user's cooking question using ONLY the recipes provided below.
+Rules:
+- Recommend or discuss only the provided recipes. Never invent recipes or ingredients.
+- Cite every recipe you mention with its id in square brackets, like [#12].
+- If none of the provided recipes fit the question, say so plainly.
+- Be concise: a short recommendation, then key ingredients or steps if helpful."""
 
 
 def recipe_document(recipe: Recipe) -> str:
@@ -108,6 +129,60 @@ class RecipeIndex:
         """Drop and recreate the collection."""
         self.client.delete_collection(self.collection_name)
         self.collection = self._open()
+
+
+def _context_block(recipe: Recipe) -> str:
+    """Format one retrieved recipe for the LLM prompt."""
+    tags = ", ".join(recipe.tag_names) or "none"
+    ingredients = "; ".join(
+        f"{i['measure']} {i['name']}".strip() for i in recipe.ingredients if i.get("name")
+    )
+    return (
+        f"[#{recipe.id}] {recipe.title} (diet: {tags})\n"
+        f"Ingredients: {ingredients}\n"
+        f"Instructions: {recipe.instructions[:MAX_INSTRUCTION_CHARS]}"
+    )
+
+
+def answer_question(
+    db: Session,
+    index: RecipeIndex,
+    llm,
+    question: str,
+    tags: list[str],
+    top_k: int,
+    max_distance: float,
+) -> AskResponse:
+    """Retrieve matching recipes, apply the relevance guardrail, and generate a cited answer."""
+    hits = [(rid, d) for rid, d in index.search(question, tags, top_k) if d <= max_distance]
+    recipes = [(db.get(Recipe, rid), d) for rid, d in hits]
+    recipes = [(r, d) for r, d in recipes if r is not None]
+    if not recipes:
+        return AskResponse(answer=GUARDRAIL_ANSWER, sources=[], grounded=False)
+
+    context = "\n\n".join(_context_block(r) for r, _ in recipes)
+    filters = f"\nDiet filters: {', '.join(tags)}" if tags else ""
+    messages = [
+        {"role": "system", "content": ASK_SYSTEM_PROMPT},
+        {"role": "user", "content": f"Recipes:\n{context}\n\nQuestion: {question}{filters}"},
+    ]
+    answer = llm.chat(messages).strip()
+
+    by_id = {r.id: (r, d) for r, d in recipes}
+    cited: list[int] = []
+    for match in CITATION.findall(answer):
+        rid = int(match)
+        if rid in by_id and rid not in cited:
+            cited.append(rid)
+    grounded = bool(cited)
+    chosen = cited if grounded else list(by_id)
+    sources = [
+        Source(recipe_id=rid, title=by_id[rid][0].title, score=round(1 - by_id[rid][1], 3))
+        for rid in chosen
+    ]
+    if tags:
+        answer = f"{answer}\n\n{ALLERGY_NOTE}"
+    return AskResponse(answer=answer, sources=sources, grounded=grounded)
 
 
 @lru_cache

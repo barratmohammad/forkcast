@@ -125,3 +125,31 @@ class SearchHit(BaseModel):
 
     recipe: RecipeOut
     score: float
+
+
+# ---------- ask ----------
+
+
+class AskRequest(BaseModel):
+    """A natural-language cooking question with optional diet filters."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    question: str = Field(min_length=3, max_length=500)
+    tags: list[DietTag] = []
+
+
+class Source(BaseModel):
+    """A recipe the answer was grounded in."""
+
+    recipe_id: int
+    title: str
+    score: float
+
+
+class AskResponse(BaseModel):
+    """The chef's answer, the recipes it cites, and whether it was properly grounded."""
+
+    answer: str
+    sources: list[Source]
+    grounded: bool
