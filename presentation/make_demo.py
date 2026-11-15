@@ -843,12 +843,16 @@ def assemble(frames, starts, end_ts, wavs, final: Path):
 
 
 async def main():
+    global GAP
     ap = argparse.ArgumentParser(description="Record the narrated presentation video.")
     ap.add_argument("output", nargs="?", default=str(HERE / "forkcast_presentation.mp4"), help="output .mp4 path")
+    ap.add_argument("--gap", type=float, default=GAP,
+                    help=f"seconds of pause after each narration line (default {GAP}); raise it to lengthen the video")
     ap.add_argument("--narration", metavar="DIR",
                     help="folder of recorded clips 01.wav, 02.wav, ... (wav/m4a/mp3); omit to use macOS `say`")
     args = ap.parse_args()
     final = Path(args.output).resolve()
+    GAP = args.gap
 
     for folder in (FRAMES, AUDIO):
         folder.mkdir(parents=True, exist_ok=True)
