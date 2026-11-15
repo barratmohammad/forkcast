@@ -38,7 +38,7 @@ OUT = HERE / "build"
 FRAMES = OUT / "frames"
 AUDIO = OUT / "audio"
 VOICE = os.environ.get("VOICE", "Samantha")
-RATE = os.environ.get("RATE", "185")
+RATE = os.environ.get("RATE", "160")  # close to a natural speaking pace
 GAP = 0.45  # pause after each narration line
 VIEW_W, VIEW_H, SCALE = 1440, 810, 4 / 3  # renders at 1920x1080
 
@@ -263,13 +263,15 @@ FINDINGS = page("""
 
 IMPROVE = page("""
 <div class="wrap"><div class="kicker">4 · With more time</div><h2>What I'd improve</h2>
-<div class="grid3">
+<div class="grid2" style="gap:22px">
  <div class="card dim" id="k1"><div class="n">01</div><h3>Stream the answer</h3>
   <p>Send tokens as they're generated, so the first words appear right away instead of after a 3–6 second spinner</p></div>
  <div class="card dim" id="k2"><div class="n">02</div><h3>Hybrid search + reranking</h3>
   <p>Keyword (BM25) search next to the vectors, then a reranker, so exact ingredient names like <span class="mono">harissa</span> always match</p></div>
  <div class="card dim" id="k3"><div class="n">03</div><h3>Grow into a real product</h3>
   <p>Nutrition estimates, shared meal plans, and PostgreSQL with an admin role for multi-user use</p></div>
+ <div class="card dim" id="k4"><div class="n">04</div><h3>An evaluation set in CI</h3>
+  <p>30 questions with the recipes they should find, run on every push, so a prompt or threshold change can't quietly make answers worse</p></div>
 </div></div>""")
 
 END = page("""
@@ -626,9 +628,15 @@ def build_steps(d: Demo):
         ("Ollama runs natively on my Mac, because Docker on a Mac can't use the GPU. The backend reaches it "
          "through host dot docker dot internal. Every endpoint validates with Pydantic, and 81 tests run without "
          "the model, using a fake client.", arch("b-be", "a-ol", "b-ol", "z-host", "foot")),
+        ("docker compose up builds both images and starts the backend first. The frontend waits for its health "
+         "check. On the very first start, the backend loads the recipes and indexes them in the background, and "
+         "if Ollama isn't running yet, it retries every thirty seconds until it is.",
+         arch("z-docker", "b-fe", "b-be", "z-vol", "b-db", "b-vs")),
         # ---- 3 · hardest problem
         ("The hardest problem was making the guardrail trustworthy. My first threshold, 0.5, was a guess. With "
          "the real model, 'how do I change a car tire' slipped through.", challenge),
+        ("To diagnose it, I wrote a small script that sends twenty real questions to the search endpoint, and "
+         "prints how far each one is from its closest recipe. Here are some of the results.", None),
         ("So I measured instead of guessing. Cooking questions scored between 0.19 and 0.39, and off-topic ones "
          "between 0.42 and 0.53. So the cut-off is 0.41, right in the gap.", tune),
         ("Live testing caught two more things. The small model writes its citations in parentheses, so I made the "
@@ -636,12 +644,14 @@ def build_steps(d: Demo):
         ("And my diet tagger found fourteen recipes that TheMealDB labels vegetarian, but that actually contain "
          "chicken stock, lard, or bacon.", finding("f2")),
         # ---- 4 · improvements
-        ("With more time, I'd add three things. First, streaming, so the answer appears as it's written.",
-         card("k1", first=True, delay=0.8)),
+        ("With more time, I'd add four things. First, streaming. Right now you wait three to six seconds for the "
+         "whole answer. Streaming would show the first words almost instantly.", card("k1", first=True, delay=0.8)),
         ("Second, hybrid search: keyword search next to the vectors, plus a reranker, so exact ingredient names "
-         "always match.", card("k2")),
-        ("And third, nutrition estimates, shared meal plans, and PostgreSQL with an admin role, so it can grow "
-         "into a real multi-user app.", card("k3")),
+         "like harissa always match, even when the meaning search misses them.", card("k2")),
+        ("Third, nutrition estimates, shared meal plans, and PostgreSQL with an admin role, so it can grow into a "
+         "real multi-user app.", card("k3")),
+        ("And fourth, an evaluation set: thirty questions with the recipes they should find, run on every push, "
+         "so a change to the prompt or the threshold can't quietly make the answers worse.", card("k4")),
         ("Thanks for watching!", end),
     ]
 

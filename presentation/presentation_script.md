@@ -56,7 +56,7 @@ on-hand: *chickpeas, spinach, rice*.
 
 **12.** And the shopping list is built in plain Python from the real ingredients, leaving out what I already have. I can download it as a checklist.
 
-## 2. Architecture (~45 s)
+## 2. Architecture (~1 min)
 
 **13.** Here's the architecture. Two containers. The Streamlit frontend only talks to the FastAPI backend, over HTTP with the JWT, using the service name backend, not localhost.
 
@@ -64,22 +64,28 @@ on-hand: *chickpeas, spinach, rice*.
 
 **15.** Ollama runs natively on my Mac, because Docker on a Mac can't use the GPU. The backend reaches it through host dot docker dot internal. Every endpoint validates with Pydantic, and 81 tests run without the model, using a fake client.
 
-## 3. Hardest problem (~45 s)
+**16.** docker compose up builds both images and starts the backend first. The frontend waits for its health check. On the very first start, the backend loads the recipes and indexes them in the background, and if Ollama isn't running yet, it retries every thirty seconds until it is.
 
-**16.** The hardest problem was making the guardrail trustworthy. My first threshold, 0.5, was a guess. With the real model, 'how do I change a car tire' slipped through.
+## 3. Hardest problem (~1 min)
 
-**17.** So I measured instead of guessing. Cooking questions scored between 0.19 and 0.39, and off-topic ones between 0.42 and 0.53. So the cut-off is 0.41, right in the gap.
+**17.** The hardest problem was making the guardrail trustworthy. My first threshold, 0.5, was a guess. With the real model, 'how do I change a car tire' slipped through.
 
-**18.** Live testing caught two more things. The small model writes its citations in parentheses, so I made the parser accept both styles.
+**18.** To diagnose it, I wrote a small script that sends twenty real questions to the search endpoint, and prints how far each one is from its closest recipe. Here are some of the results.
 
-**19.** And my diet tagger found fourteen recipes that TheMealDB labels vegetarian, but that actually contain chicken stock, lard, or bacon.
+**19.** So I measured instead of guessing. Cooking questions scored between 0.19 and 0.39, and off-topic ones between 0.42 and 0.53. So the cut-off is 0.41, right in the gap.
 
-## 4. What I'd improve (~25 s)
+**20.** Live testing caught two more things. The small model writes its citations in parentheses, so I made the parser accept both styles.
 
-**20.** With more time, I'd add three things. First, streaming, so the answer appears as it's written.
+**21.** And my diet tagger found fourteen recipes that TheMealDB labels vegetarian, but that actually contain chicken stock, lard, or bacon.
 
-**21.** Second, hybrid search: keyword search next to the vectors, plus a reranker, so exact ingredient names always match.
+## 4. What I'd improve (~1 min)
 
-**22.** And third, nutrition estimates, shared meal plans, and PostgreSQL with an admin role, so it can grow into a real multi-user app.
+**22.** With more time, I'd add four things. First, streaming. Right now you wait three to six seconds for the whole answer. Streaming would show the first words almost instantly.
 
-**23.** Thanks for watching!
+**23.** Second, hybrid search: keyword search next to the vectors, plus a reranker, so exact ingredient names like harissa always match, even when the meaning search misses them.
+
+**24.** Third, nutrition estimates, shared meal plans, and PostgreSQL with an admin role, so it can grow into a real multi-user app.
+
+**25.** And fourth, an evaluation set: thirty questions with the recipes they should find, run on every push, so a change to the prompt or the threshold can't quietly make the answers worse.
+
+**26.** Thanks for watching!
